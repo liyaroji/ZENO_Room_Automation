@@ -1,0 +1,79 @@
+int pirPin = 27;
+int relayPin = 26;
+
+bool activeLow = true;  // set to false if your relay clicks backwards
+
+bool motionState = false;
+bool lastMotionState = false;
+unsigned long motionStartTime = 0;
+
+void setup() {
+  pinMode(pirPin, INPUT);
+  pinMode(relayPin, OUTPUT);
+  digitalWrite(relayPin, activeLow ? HIGH : LOW);
+  Serial.begin(115200);
+  Serial.println("========================================");
+  Serial.println("   PIR + Relay + LED System - ESP32       ");
+  Serial.println("========================================");
+}
+
+void setRelay(bool on) {
+  if (activeLow) {
+    digitalWrite(relayPin, on ? LOW : HIGH);
+  } else {
+    digitalWrite(relayPin, on ? HIGH : LOW);
+  }
+}
+
+String getFormattedTime(unsigned long ms) {
+  unsigned long totalSeconds = ms / 1000;
+  unsigned long hours = totalSeconds / 3600;
+  unsigned long minutes = (totalSeconds % 3600) / 60;
+  unsigned long seconds = totalSeconds % 60;
+  char buf[12];
+  sprintf(buf, "%02lu:%02lu:%02lu", hours, minutes, seconds);
+  return String(buf);
+}
+
+void loop() {
+  motionState = digitalRead(pirPin);
+  unsigned long currentTime = millis();
+  String timeStr = getFormattedTime(currentTime);
+
+  if (motionState == HIGH && lastMotionState == LOW) {
+    motionStartTime = currentTime;
+    setRelay(true);
+    Serial.println("----------------------------------------");
+    Serial.print("[");
+    Serial.print(timeStr);
+    Serial.println("] >> MOTION DETECTED -- LED ON <<");
+  }
+
+  if (motionState == LOW && lastMotionState == HIGH) {
+    unsigned long totalDuration = (currentTime - motionStartTime) / 1000;
+    setRelay(false);
+    Serial.print("[");
+    Serial.print(timeStr);
+    Serial.print("] Motion ended. LED OFF. Total duration: ");
+    Serial.print(totalDuration);
+    Serial.println("s");
+    Serial.println("----------------------------------------");
+  }
+
+  // Real-time status update, every loop
+  if (motionState == HIGH) {
+    unsigned long duration = (currentTime - motionStartTime) / 1000;
+    Serial.print("[");
+    Serial.print(timeStr);
+    Serial.print("] Status : ACTIVE   |   LED: ON   |   Duration: ");
+    Serial.print(duration);
+    Serial.println("s");
+  } else {
+    Serial.print("[");
+    Serial.print(timeStr);
+    Serial.println("] Status : IDLE  |  LED: OFF");
+  }
+
+  lastMotionState = motionState;
+  delay(100);
+}
